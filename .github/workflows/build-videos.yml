@@ -2,6 +2,12 @@ name: VIRALORA - Build Draft Videos
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "scripts/**"
+      - "content/**"
+      - "requirements.txt"
+      - ".github/workflows/build-videos.yml"
 
 permissions:
   contents: read
@@ -16,13 +22,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install system tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg espeak-ng
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: "pip"
