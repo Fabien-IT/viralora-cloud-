@@ -1,0 +1,29 @@
+{
+  "brand": "VIRALORA",
+  "videos": [
+    {
+      "language": "fr",
+      "title": "Une graine, une forêt",
+      "hook": "Tout commence par quelque chose de minuscule.",
+      "scenes": [
+        {"narration": "Une petite graine semble presque sans importance.", "screen_text": "UNE PETITE GRAINE"},
+        {"narration": "Sous la terre, elle absorbe l'eau et commence à s'ouvrir.", "screen_text": "L'EAU RÉVEILLE LA VIE"},
+        {"narration": "Une racine descend, tandis qu'une pousse cherche la lumière.", "screen_text": "LES RACINES DESCENDENT"},
+        {"narration": "Avec du temps et de bonnes conditions, elle peut devenir un arbre.", "screen_text": "LA VIE PREND FORME"}
+      ],
+      "cta": "Suis VIRALORA pour découvrir le monde autrement."
+    },
+    {
+      "language": "en",
+      "title": "The tiny beginning",
+      "hook": "Every big thing starts incredibly small.",
+      "scenes": [
+        {"narration": "A tiny seed can look like almost nothing.", "screen_text": "A TINY SEED"},
+        {"narration": "With water, it begins to absorb moisture and open.", "screen_text": "WATER STARTS THE CHANGE"},
+        {"narration": "Roots grow down while a shoot reaches toward the light.", "screen_text": "ROOTS DOWN, SHOOT UP"},
+        {"narration": "With time and the right conditions, it can become a tree.", "screen_text": "GROWTH TAKES TIME"}
+      ],
+      "cta": "Follow VIRALORA and discover something new."
+    }
+  ]
+}
