@@ -1,0 +1,17 @@
+{
+  "brand": "VIRALORA",
+  "languages": ["fr", "en"],
+  "daily_video_target": 2,
+  "aspect_ratio": "9:16",
+  "resolution": "1080x1920",
+  "hosting_policy": "free_only",
+  "publication_policy": "human_review_required",
+  "publishing_enabled": false,
+  "paid_api_calls_allowed": false,
+  "workflow": ["research", "script", "editorial_quality", "voice", "visuals", "render", "technical_quality", "human_review", "manual_publish"],
+  "notes": [
+    "This repository currently renders motion-card videos with offline Piper voices.",
+    "Fresh web research and fully generative AI scripts are not yet wired into the GitHub runner.",
+    "No social publishing integration is enabled."
+  ]
+}
