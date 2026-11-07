@@ -1,0 +1,41 @@
+name: VIRALORA - Build Draft Videos
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: viralora-video-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Build French and English drafts
+        run: python scripts/build_videos.py --input content/queue.json --output dist
+      - name: Validate outputs
+        run: python scripts/validate_videos.py dist
+      - name: Upload draft videos
+        uses: actions/upload-artifact@v4
+        with:
+          name: viralora-drafts
+          path: dist/*.mp4
+          if-no-files-found: error
+          retention-days: 3
