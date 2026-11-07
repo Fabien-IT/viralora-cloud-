@@ -1,0 +1,20 @@
+name: Validate VIRALORA project
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r requirements.txt
+      - run: python -m json.tool content/queue.json > /dev/null
+      - run: python -m py_compile scripts/build_videos.py scripts/validate_videos.py
