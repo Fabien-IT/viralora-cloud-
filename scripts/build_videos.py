@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Build vertical motion-card MP4 drafts using Pillow, eSpeak NG and FFmpeg."""
+"""Create illustrated vertical VIRALORA drafts with scene-matched voice and captions."""
 import argparse
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -9,27 +10,27 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1080, 1920
-BG1, BG2 = (12, 10, 25), (38, 18, 70)
-WHITE, MUTED, ACCENT = (248, 246, 255), (190, 183, 210), (150, 105, 255)
+BG_TOP, BG_BOTTOM = (8, 13, 31), (27, 18, 53)
+WHITE, MUTED, PURPLE = (250, 248, 255), (190, 195, 218), (151, 113, 255)
+GREEN, SOIL = (106, 205, 145), (91, 62, 49)
 
 def run(cmd):
     subprocess.run(cmd, check=True)
 
 def font(size, bold=False):
     name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    candidates = [Path("/usr/share/fonts/truetype/dejavu") / name,
-                  Path("/usr/share/fonts/truetype/liberation2") / ("LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf")]
-    for path in candidates:
-        if path.exists():
-            return ImageFont.truetype(str(path), size)
+    for p in (Path("/usr/share/fonts/truetype/dejavu") / name,
+              Path("/usr/share/fonts/truetype/liberation2") / ("LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf")):
+        if p.exists():
+            return ImageFont.truetype(str(p), size)
     return ImageFont.load_default()
 
-def wrap(draw, text, fnt, max_width):
+def wrap(draw, text, fnt, width):
     lines, line = [], ""
     for word in text.split():
-        trial = (line + " " + word).strip()
-        if draw.textbbox((0, 0), trial, font=fnt)[2] <= max_width:
-            line = trial
+        candidate = (line + " " + word).strip()
+        if draw.textbbox((0, 0), candidate, font=fnt)[2] <= width:
+            line = candidate
         else:
             if line:
                 lines.append(line)
@@ -38,93 +39,128 @@ def wrap(draw, text, fnt, max_width):
         lines.append(line)
     return lines
 
-def make_card(path, brand, title, label, idx, total):
+def centered(draw, text, y, fnt, fill, max_width=900):
+    lines = wrap(draw, text, fnt, max_width)
+    for line in lines:
+        box = draw.textbbox((0, 0), line, font=fnt)
+        x = (W - (box[2] - box[0])) // 2
+        draw.text((x, y), line, font=fnt, fill=fill)
+        y += (box[3] - box[1]) + 18
+    return y
+
+def draw_plant(draw, stage):
+    # A clear visual metaphor: seed -> germination -> sprout -> young tree.
+    ground = 1120
+    draw.rectangle((0, ground, W, H), fill=(20, 31, 42))
+    draw.rectangle((0, ground, W, ground + 24), fill=SOIL)
+    for x in range(40, W, 95):
+        draw.ellipse((x, ground + 70, x + 10, ground + 80), fill=(111, 91, 80))
+    cx = W // 2
+    if stage == 0:
+        draw.ellipse((cx-95, ground-90, cx+95, ground+75), fill=(193, 144, 83), outline=(244, 203, 137), width=8)
+        draw.arc((cx-48, ground-45, cx+48, ground+30), 10, 170, fill=(111, 72, 48), width=8)
+        draw.text((cx-180, ground+220), "01  •  THE SEED", font=font(34, True), fill=MUTED)
+    else:
+        # Root system grows downward in visible branches.
+        root_len = min(stage, 3) * 95
+        draw.line((cx, ground-5, cx, ground+root_len), fill=(226, 194, 142), width=18)
+        if stage >= 2:
+            for sign in (-1, 1):
+                draw.line((cx, ground+65, cx+sign*95, ground+155), fill=(226,194,142), width=12)
+                draw.line((cx+sign*95, ground+155, cx+sign*145, ground+220), fill=(226,194,142), width=8)
+        height = 190 if stage == 1 else (390 if stage == 2 else 570)
+        draw.line((cx, ground, cx, ground-height), fill=GREEN, width=25)
+        if stage >= 2:
+            draw.ellipse((cx-185, ground-height+80, cx-5, ground-height+210), fill=(73, 174, 111))
+            draw.ellipse((cx+5, ground-height+10, cx+185, ground-height+145), fill=(89, 194, 125))
+        if stage >= 3:
+            draw.ellipse((cx-250, ground-height-130, cx-35, ground-height+40), fill=(77, 181, 113))
+            draw.ellipse((cx+35, ground-height-170, cx+250, ground-height+10), fill=(91, 198, 125))
+            draw.ellipse((cx-115, ground-height-270, cx+115, ground-height-40), fill=(111, 211, 139))
+        draw.text((cx-180, ground+220), f"0{stage+1}  •  GROWTH", font=font(34, True), fill=MUTED)
+
+def make_scene(path, brand, title, caption, idx, total, language):
     im = Image.new("RGB", (W, H))
-    draw = ImageDraw.Draw(im)
-    # Vertical gradient, drawn in horizontal bands for reasonable runtime.
+    pix = im.load()
     for y in range(H):
         t = y / H
-        color = tuple(int(BG1[k] * (1 - t) + BG2[k] * t) for k in range(3))
-        draw.line((0, y, W, y), fill=color)
-    draw.ellipse((690, 160, 1220, 690), outline=(82, 58, 130), width=8)
-    draw.ellipse((-220, 1190, 390, 1810), outline=(70, 48, 112), width=8)
-    draw.rounded_rectangle((76, 90, 1004, 180), radius=34, fill=(54, 36, 88))
-    draw.text((112, 112), brand.upper(), font=font(40, True), fill=WHITE)
-    draw.text((900, 117), f"{idx:02d}/{total:02d}", font=font(34, True), fill=MUTED)
-    y = 480
-    for line in wrap(draw, title, font(74, True), 850)[:3]:
-        draw.text((100, y), line, font=font(74, True), fill=WHITE)
-        y += 96
-    draw.rounded_rectangle((88, 1050, 992, 1490), radius=44, fill=(29, 23, 48), outline=ACCENT, width=5)
-    y = 1130
-    for line in wrap(draw, label, font(54, True), 790)[:5]:
-        draw.text((145, y), line, font=font(54, True), fill=WHITE)
-        y += 76
-    draw.text((100, 1760), "CONTENT WITHOUT BORDERS", font=font(30, True), fill=MUTED)
-    im.save(path, quality=95)
+        c = tuple(int(BG_TOP[k]*(1-t)+BG_BOTTOM[k]*t) for k in range(3))
+        for x in range(W):
+            pix[x,y] = c
+    d = ImageDraw.Draw(im)
+    # Branded header and subtle graphic accents.
+    d.rounded_rectangle((58, 70, 1022, 166), radius=42, fill=(40, 35, 73), outline=(91, 76, 139), width=2)
+    d.text((100, 94), brand.upper(), font=font(42, True), fill=WHITE)
+    d.text((865, 103), f"{idx:02d}/{total:02d}", font=font(32, True), fill=MUTED)
+    centered(d, title, 245, font(66, True), WHITE, 900)
+    stage = min(max(idx-1, 0), 3)
+    draw_plant(d, stage)
+    # Caption panel sits above illustration to stay readable on phones.
+    panel=(70, 1390, 1010, 1705)
+    d.rounded_rectangle(panel, radius=42, fill=(12, 17, 36), outline=PURPLE, width=4)
+    lines=wrap(d, caption, font(49, True), 800)[:4]
+    heights=sum(d.textbbox((0,0),s,font=font(49,True))[3]+22 for s in lines)
+    y=panel[1]+(panel[3]-panel[1]-heights)//2
+    for line in lines:
+        box=d.textbbox((0,0),line,font=font(49,True))
+        d.text(((W-(box[2]-box[0]))//2,y),line,font=font(49,True),fill=WHITE)
+        y += box[3]+22
+    footer = "DÉCOUVRIR • APPRENDRE • PARTAGER" if language=="fr" else "DISCOVER • LEARN • SHARE"
+    centered(d, footer, 1790, font(27, True), MUTED, 950)
+    im.save(path, quality=94)
 
 def synthesize(text, lang, out):
-    exe = shutil.which("espeak-ng") or shutil.which("espeak")
+    exe=shutil.which("espeak-ng") or shutil.which("espeak")
     if not exe:
         raise RuntimeError("eSpeak NG is not installed")
-    run([exe, "-v", lang, "-s", "148", "-w", str(out), text])
+    voice = "fr" if lang=="fr" else "en"
+    run([exe,"-v",voice,"-s","145","-w",str(out),text])
 
-def audio_duration(ffprobe, audio):
-    value = subprocess.check_output(
-        [ffprobe, "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", str(audio)],
-        text=True
-    ).strip()
-    return max(float(value) + 0.45, 2.0)
+def duration_of(ffprobe, audio):
+    s=subprocess.check_output([ffprobe,"-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(audio)],text=True).strip()
+    return max(float(s)+0.65,2.2)
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="content/queue.json")
-    parser.add_argument("--output", default="dist")
-    args = parser.parse_args()
-    ffmpeg, ffprobe = shutil.which("ffmpeg"), shutil.which("ffprobe")
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--input",default="content/queue.json")
+    ap.add_argument("--output",default="dist")
+    a=ap.parse_args()
+    ffmpeg,ffprobe=shutil.which("ffmpeg"),shutil.which("ffprobe")
     if not ffmpeg or not ffprobe:
         raise RuntimeError("FFmpeg and ffprobe are required")
-    data = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    videos = data.get("videos", [])
-    if len(videos) != 2 or {v.get("language") for v in videos} != {"fr", "en"}:
+    data=json.loads(Path(a.input).read_text(encoding="utf-8"))
+    videos=data.get("videos",[])
+    if len(videos)!=2 or {v.get("language") for v in videos}!={"fr","en"}:
         raise ValueError("Queue must contain exactly one fr and one en video")
-    outdir = Path(args.output)
-    outdir.mkdir(parents=True, exist_ok=True)
-    tmp = outdir / "_work"
-    tmp.mkdir(exist_ok=True)
+    out=Path(a.output); out.mkdir(parents=True,exist_ok=True)
+    tmp=out/"_work"; tmp.mkdir(exist_ok=True)
     try:
         for video in videos:
-            lang = video["language"]
-            scenes = video.get("scenes", [])
-            if not scenes:
-                raise ValueError(f"{lang}: no scenes")
-            narration = [video.get("hook", "")] + [s["narration"] for s in scenes] + [video.get("cta", "")]
-            labels = [video.get("hook", "")] + [s["screen_text"] for s in scenes] + [video.get("cta", "")]
-            segments = []
-            for i, (spoken, label) in enumerate(zip(narration, labels), 1):
-                wav, png, mp4 = (tmp / f"{lang}_{i}.{ext}" for ext in ("wav", "png", "mp4"))
-                synthesize(spoken, lang, wav)
-                make_card(png, data.get("brand", "VIRALORA"), video["title"], label, i, len(narration))
-                duration = audio_duration(ffprobe, wav)
-                run([ffmpeg, "-y", "-loop", "1", "-framerate", "25", "-i", str(png),
-                     "-i", str(wav), "-t", f"{duration:.3f}",
-                     "-vf", "scale=1080:1920,zoompan=z='min(zoom+0.0005,1.04)':d=1:s=1080x1920:fps=25,format=yuv420p",
-                     "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25",
-                     "-c:a", "aac", "-b:a", "96k", "-shortest", "-movflags", "+faststart", str(mp4)])
-                segments.append(mp4)
-            listing = tmp / f"{lang}_concat.txt"
-            listing.write_text("".join(f"file '{p.resolve()}'\n" for p in segments), encoding="utf-8")
-            final = outdir / f"viralora_{lang}.mp4"
-            run([ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-                 "-c", "copy", "-movflags", "+faststart", str(final)])
+            lang=video["language"]; scenes=video.get("scenes",[])
+            if not scenes: raise ValueError(f"{lang}: no scenes")
+            spoken=[video.get("hook","")]+[s["narration"] for s in scenes]+[video.get("cta","")]
+            captions=[video.get("hook","")]+[s["screen_text"] for s in scenes]+[video.get("cta","")]
+            clips=[]
+            for i,(words,caption) in enumerate(zip(spoken,captions),1):
+                wav=tmp/f"{lang}_{i}.wav"; png=tmp/f"{lang}_{i}.png"; mp4=tmp/f"{lang}_{i}.mp4"
+                synthesize(words,lang,wav)
+                make_scene(png,data.get("brand","VIRALORA"),video["title"],caption,i,len(spoken),lang)
+                dur=duration_of(ffprobe,wav)
+                # Gentle zoom and full-duration narration; each caption remains visible for its spoken scene.
+                run([ffmpeg,"-y","-loop","1","-framerate","25","-i",str(png),"-i",str(wav),
+                     "-t",f"{dur:.3f}","-vf","scale=1080:1920,zoompan=z='min(zoom+0.00035,1.025)':d=1:s=1080x1920:fps=25,format=yuv420p",
+                     "-c:v","libx264","-preset","ultrafast","-crf","24","-c:a","aac","-b:a","112k",
+                     "-shortest","-movflags","+faststart",str(mp4)])
+                clips.append(mp4)
+            listing=tmp/f"{lang}_concat.txt"
+            listing.write_text("".join(f"file '{p.resolve()}'\n" for p in clips),encoding="utf-8")
+            final=out/f"viralora_{lang}.mp4"
+            run([ffmpeg,"-y","-f","concat","-safe","0","-i",str(listing),"-c","copy","-movflags","+faststart",str(final)])
             print(f"Created {final}")
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(tmp,ignore_errors=True)
 
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        sys.exit(1)
+if __name__=="__main__":
+    try: main()
+    except Exception as e:
+        print(f"ERROR: {e}",file=sys.stderr); sys.exit(1)
