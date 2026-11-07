@@ -110,11 +110,21 @@ def make_scene(path, brand, title, caption, idx, total, language):
     im.save(path, quality=94)
 
 def synthesize(text, lang, out):
-    exe=shutil.which("espeak-ng") or shutil.which("espeak")
+    """Neural speech from offline Piper voice models; never silently fall back to eSpeak."""
+    import os
+    exe=shutil.which("piper")
     if not exe:
-        raise RuntimeError("eSpeak NG is not installed")
-    voice = "fr" if lang=="fr" else "en"
-    run([exe,"-v",voice,"-s","145","-w",str(out),text])
+        raise RuntimeError("Piper TTS is missing. Install piper-tts.")
+    model=Path("models") / ("fr_FR-tom-medium.onnx" if lang=="fr" else "en_US-ryan-medium.onnx")
+    if not model.exists() or not Path(str(model)+".json").exists():
+        raise RuntimeError(f"Missing neural voice model: {model}")
+    # Slightly slower speech for a documentary cadence. Pitch is intrinsic to the voice.
+    result=subprocess.run([exe,"--model",str(model),"--output_file",str(out),
+                           "--length_scale","1.12"],
+                          input=text,text=True,check=True,capture_output=True)
+    if not out.exists() or out.stat().st_size < 1000:
+        raise RuntimeError(f"Voice generation failed: {result.stderr}")
+
 
 def duration_of(ffprobe, audio):
     s=subprocess.check_output([ffprobe,"-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(audio)],text=True).strip()
